@@ -1,0 +1,27 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Get a free hosted Postgres database in seconds: `npx create-db`
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Complaint {
+  id           String   @id @default(cuid())
+  ticketNumber String   @unique
+
+  phone        String
+  ttNumber     String
+  name         String?
+  description  String?
+
+  status       String   @default("PENDING")
+
+  createdAt    DateTime @default(now())
+}
