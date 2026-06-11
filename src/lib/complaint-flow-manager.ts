@@ -77,6 +77,36 @@ export class ComplaintFlowManager {
 
     const session = await this.getOrCreateSession();
 
+    // Catch action triggers for generating shareable layout data copies
+    if (sanitizedText.startsWith("SHARE_TICKET_")) {
+      const targetTicketId = sanitizedText.replace("SHARE_TICKET_", "");
+      const ticketToShare = await prisma.complaint.findUnique({
+        where: { ticketNumber: targetTicketId }
+      });
+
+      if (!ticketToShare) {
+        await sendMessage(this.phone, "❌ *Error:* Requested ticket log could not be generated for sharing.");
+        return;
+      }
+
+      const shareContent = 
+        `📋 *SHARED TICKET DATA*\n` +
+        `---------------------------\n` +
+        `🎫 *Ticket:* ${ticketToShare.ticketNumber}\n` +
+        `📞 *Service Identifier:* ${ticketToShare.serviceNumber}\n` +
+        `📊 *Classification:* ${ticketToShare.tasksClassification}\n` +
+        `⚙️ *Type:* ${ticketToShare.requestType} ➔ ${ticketToShare.specificRequestType}\n` +
+        `📍 *Operational Zone:* ${ticketToShare.zone}\n` +
+        `📝 *Status:* [${ticketToShare.status}]\n` +
+        `💬 *Remarks:* "${ticketToShare.remarks}"\n\n` +
+        `_Copy and forward this message context anywhere needed._`;
+
+      await sendButtons(this.phone, shareContent, [
+        { id: "ACTION_SUMMARY", title: "📊 Main Dashboard" }
+      ]);
+      return;
+    }
+
     switch (session.step) {
       case "IDLE":
         if (cleanLower.includes("complaint") || sanitizedText === "START_COMPLAINT") {
@@ -87,7 +117,6 @@ export class ComplaintFlowManager {
             [{ id: "ACTION_CANCEL", title: "❌ Cancel Draft" }]
           );
         } else if (cleanLower.includes("find") || sanitizedText === "START_SEARCH") {
-          // Dynamic tracking shift for searching lines
           await this.updateSession({ step: "AWAITING_SEARCH_SERVICE_NUM" });
           await sendButtons(
             this.phone,
@@ -95,7 +124,6 @@ export class ComplaintFlowManager {
             [{ id: "ACTION_CANCEL", title: "❌ Back to Menu" }]
           );
         } else {
-          // Home Menu rendering buttons cleanly with exact same styling layout
           await sendButtons(
             this.phone,
             "👋 *Welcome to the IP Service Support Portal*\n\nChoose an action below to manage or file your service tickets.",
@@ -108,20 +136,17 @@ export class ComplaintFlowManager {
         }
         break;
 
-      // 🔍 SEARCH FLOW ENGINE CASE
       case "AWAITING_SEARCH_SERVICE_NUM":
         if (sanitizedText.length < 4) {
           await sendMessage(this.phone, "❌ *Format Error.* The Service Number string is too short. Please try again:");
           return;
         }
 
-        // Directly query the Complaint model by serviceNumber
         const foundComplaints = await prisma.complaint.findMany({
           where: { serviceNumber: sanitizedText },
           orderBy: { createdAt: "desc" }
         });
 
-        // Always switch state back to IDLE to prevent loop lock
         await this.updateSession({ step: "IDLE" });
 
         if (foundComplaints.length === 0) {
@@ -304,11 +329,12 @@ export class ComplaintFlowManager {
           `📍 *Dispatched Zone:* ${localizedZoneLabel}\n` +
           `📝 *Remarks:* "${sanitizedText}"`;
 
+        // Included SHARE_TICKET button to allow text transformation and easy forwarding
         await sendButtons(
           this.phone,
           receipt,
           [
-            { id: "START_COMPLAINT", title: "📝 New Complaint" },
+            { id: `SHARE_TICKET_${ticketId}`, title: "🔗 Share Ticket" },
             { id: "ACTION_SUMMARY", title: "📊 Main Dashboard" }
           ]
         );
