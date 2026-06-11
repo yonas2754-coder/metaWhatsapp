@@ -12,7 +12,6 @@ datasource db {
   provider = "postgresql"
 }
 
-
 enum Zone {
   EAAZ
   CAAZ
@@ -60,44 +59,33 @@ enum SpecificRequestType {
   SPEED_UPGRADE
 }
 
-// 🟢 NEW MODEL: Handles live validation lookup targets for the WhatsApp Engine
-model RegisteredService {
-  id            String   @id @default(cuid())
-  serviceNumber String   @unique // Target lookup index (e.g., "DSL-102030")
-  clientName    String
-  companyName   String?
-  createdAt     DateTime @default(now())
-
-  @@index([serviceNumber])
-}
-
 model Complaint {
-  id                  String              @id @default(cuid())
-  ticketNumber        String              @unique
-  phone               String
-  serviceNumber       String
-  tasksClassification TaskClassification
-  requestType         RequestType
-  specificRequestType SpecificRequestType
-  zone                Zone
-  remarks             String
-  status              String              @default("PENDING")
-  createdAt           DateTime            @default(now())
+  id                    String              @id @default(cuid())
+  ticketNumber          String              @unique
+  phone                 String
+  serviceNumber         String
+  tasksClassification   TaskClassification
+  requestType           RequestType
+  specificRequestType   SpecificRequestType
+  zone                  Zone
+  remarks               String
+  status                String              @default("PENDING")
+  createdAt             DateTime            @default(now())
 
   @@index([phone])
   @@index([ticketNumber])
 }
 
 model UserSession {
-  phone                   String   @id
-  step                    String   @default("IDLE") 
+  phone                    String   @id
+  step                     String   @default("IDLE") 
   // Step list: IDLE, AWAITING_SERVICE_NUM, AWAITING_CLASS, AWAITING_REQ_TYPE, AWAITING_SPECIFIC, AWAITING_ZONE, AWAITING_REMARKS
-  tempServiceNumber       String?
-  tempTasksClassification String?
-  tempRequestType         String?
-  tempSpecificRequestType String?
-  tempZone                String?
-  updatedAt               DateTime @updatedAt
+  tempServiceNumber        String?
+  tempTasksClassification  String?
+  tempRequestType          String?
+  tempSpecificRequestType  String?
+  tempZone                 String?
+  updatedAt                DateTime @updatedAt
 
   @@index([phone])
 }
