@@ -25,8 +25,7 @@ export default async function Dashboard() {
             <tr key={c.id}>
               <td>{c.ticketNumber}</td>
               <td>{c.phone}</td>
-              <td>{c.ttNumber}</td>
-              <td>{c.name}</td>
+          
               <td>{c.status}</td>
             </tr>
           ))}

@@ -12,21 +12,80 @@ datasource db {
   provider = "postgresql"
 }
 
+enum Zone {
+  EAAZ
+  CAAZ
+  SAAZ
+  NAAZ
+  SWAAZ
+  WAAZ
+  NR_Mekele
+  NWR_Bahirdar
+  ER_Dire_Dawa
+  CER_Harar
+  CNR_D_Birhan
+  WR_Nekempt
+  SER_Adama
+  SR_Hawassa
+  SWR_Jimma
+  CWR_Ambo
+  EER_Jigiiga
+  NEER_Semera
+  NNWR_Gonder
+  NER_Dessie
+  SWWR_Gambela
+  WWR_Assosa
+  SSWR_Wolyta
+  Bill_Section
+  Enterprise_office
+}
+
+enum TaskClassification {
+  TECHNICAL
+  BILLING
+  PROVISIONING
+}
+
+enum RequestType {
+  FAULT
+  NEW_SERVICE
+  MODIFICATION
+}
+
+enum SpecificRequestType {
+  BROADBAND_DOWN
+  FIBER_CUT
+  INVOICE_DISPUTE
+  SPEED_UPGRADE
+}
+
 model Complaint {
-  id           String   @id @default(cuid())
-  ticketNumber String   @unique
-  phone        String
-  ttNumber     String
-  name         String?
-  description  String?
-  status       String   @default("PENDING")
-  createdAt    DateTime @default(now())
+  id                    String              @id @default(cuid())
+  ticketNumber          String              @unique
+  phone                 String
+  serviceNumber         String
+  tasksClassification   TaskClassification
+  requestType           RequestType
+  specificRequestType   SpecificRequestType
+  zone                  Zone
+  remarks               String
+  status                String              @default("PENDING")
+  createdAt             DateTime            @default(now())
+
+  @@index([phone])
+  @@index([ticketNumber])
 }
 
 model UserSession {
-  phone        String   @id // Use phone number as unique session ID
-  step         String   @default("IDLE") // IDLE, AWAITING_TT, AWAITING_NAME, AWAITING_DESC
-  tempTtNumber String?
-  tempName     String?
-  updatedAt    DateTime @updatedAt
+  phone                    String   @id
+  step                     String   @default("IDLE") 
+  // Step list: IDLE, AWAITING_SERVICE_NUM, AWAITING_CLASS, AWAITING_REQ_TYPE, AWAITING_SPECIFIC, AWAITING_ZONE, AWAITING_REMARKS
+  tempServiceNumber        String?
+  tempTasksClassification  String?
+  tempRequestType          String?
+  tempSpecificRequestType  String?
+  tempZone                 String?
+  updatedAt                DateTime @updatedAt
+
+  @@index([phone])
 }
