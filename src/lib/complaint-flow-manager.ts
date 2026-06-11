@@ -77,7 +77,7 @@ export class ComplaintFlowManager {
 
     const session = await this.getOrCreateSession();
 
-    // Catch action triggers for generating shareable template text blocks
+    // Catch action triggers for generating shareable layout data copies
     if (sanitizedText.startsWith("SHARE_TICKET_")) {
       const targetTicketId = sanitizedText.replace("SHARE_TICKET_", "");
       const ticketToShare = await prisma.complaint.findUnique({
@@ -89,26 +89,33 @@ export class ComplaintFlowManager {
         return;
       }
 
+      // Readable label values for systemic display
+      const localizedZoneLabel = ZONE_OPTIONS.find(o => o.enum === ticketToShare.zone)?.label || ticketToShare.zone;
+      const localizedClassLabel = CLASSIFICATION_OPTIONS.find(o => o.enum === ticketToShare.tasksClassification)?.label || ticketToShare.tasksClassification;
+      const localizedTypeLabel = REQUEST_TYPE_OPTIONS.find(o => o.enum === ticketToShare.requestType)?.label || ticketToShare.requestType;
+      const localizedSpecificLabel = SPECIFIC_REQUEST_OPTIONS.find(o => o.enum === ticketToShare.specificRequestType)?.label || ticketToShare.specificRequestType;
+
+      // Clean template to be sent to the target user
       const shareContent = 
         `📋 *FORWARDED TICKET DATA*\n` +
         `---------------------------\n` +
         `🎫 *Ticket:* ${ticketToShare.ticketNumber}\n` +
         `📞 *Service Identifier:* ${ticketToShare.serviceNumber}\n` +
-        `📊 *Classification:* ${ticketToShare.tasksClassification}\n` +
-        `⚙️ *Type:* ${ticketToShare.requestType} ➔ ${ticketToShare.specificRequestType}\n` +
-        `📍 *Operational Zone:* ${ticketToShare.zone}\n` +
+        `📊 *Classification:* ${localizedClassLabel}\n` +
+        `⚙️ *Type:* ${localizedTypeLabel} ➔ ${localizedSpecificLabel}\n` +
+        `📍 *Operational Zone:* ${localizedZoneLabel}\n` +
         `📝 *Status:* [${ticketToShare.status}]\n` +
         `💬 *Remarks:* "${ticketToShare.remarks}"`;
 
       const whatsappNativeShareUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(shareContent)}`;
 
-      // The raw blue link is removed from here. The URL is passed cleanly inside the button instead.
+      // Using Markdown [Text](URL) format to completely hide the long link inside a professional anchor text line.
       const instructionsMessage = 
         `${shareContent}\n\n` +
-        `Click the button below to forward this information to your team or supervisor.`;
+        `🔗 *Forward Ticket:* [👉 Click Here to Choose Contact](${whatsappNativeShareUrl})\n\n` +
+        `💡 _Tap the link text above to open your contact selection list and forward this ticket context right away._`;
 
       await sendButtons(this.phone, instructionsMessage, [
-        { title: "🚀 Forward Ticket", url: whatsappNativeShareUrl },
         { id: "ACTION_SUMMARY", title: "📊 Main Dashboard" }
       ]);
       return;
