@@ -1,9 +1,13 @@
 // src/lib/complaint-flow-manager.ts
-import { RequestType, SpecificRequestType, TaskClassification, Zone } from "@/generated/prisma/enums";
-import { prisma } from "@/lib/prisma";
-import { sendMessage } from "@/lib/whatsapp";
 
-// HELPER DICTIONARIES FOR CLEAN LIST MENUS MAPPING
+import { Zone } from "@/generated/prisma/enums";
+import { TaskClassification } from "@/generated/prisma/enums";
+import { RequestType } from "@/generated/prisma/enums";
+import { SpecificRequestType } from "@/generated/prisma/enums";
+
+import { prisma } from "@/lib/prisma";
+import { sendMessage, sendButtons } from "@/lib/whatsapp";
+
 const CLASSIFICATION_OPTIONS = [
   { key: "1", enum: TaskClassification.TECHNICAL, label: "Technical Fault" },
   { key: "2", enum: TaskClassification.BILLING, label: "Billing & Invoicing" },
@@ -23,7 +27,6 @@ const SPECIFIC_REQUEST_OPTIONS = [
   { key: "4", enum: SpecificRequestType.SPEED_UPGRADE, label: "Bandwidth Speed Upgrade Query" }
 ];
 
-// Complete array of your exact required telecom deployment zones
 const ZONE_OPTIONS = [
   { key: "1", enum: Zone.EAAZ, label: "East Addis Ababa Zone (EAAZ)" },
   { key: "2", enum: Zone.CAAZ, label: "Central Addis Ababa Zone (CAAZ)" },
@@ -63,12 +66,11 @@ export class ComplaintFlowManager {
     const sanitizedText = text.trim();
     const cleanLower = sanitizedText.toLowerCase();
 
-    // Global Commands Check
-    if (cleanLower === "summary" || cleanLower === "status") {
+    if (cleanLower === "summary" || sanitizedText === "ACTION_SUMMARY") {
       await this.sendSummaryData();
       return;
     }
-    if (cleanLower === "cancel" || cleanLower === "reset") {
+    if (cleanLower === "cancel" || sanitizedText === "ACTION_CANCEL") {
       await this.resetSession("Ticket draft discarded successfully.");
       return;
     }
@@ -79,17 +81,19 @@ export class ComplaintFlowManager {
       case "IDLE":
         if (cleanLower.includes("complaint") || sanitizedText === "START_COMPLAINT") {
           await this.updateSession({ step: "AWAITING_SERVICE_NUM" });
-          await sendMessage(
+          await sendButtons(
             this.phone,
-            "📋 *New Service Ticket Request*\n\nPlease reply with your *Service Number* (e.g., Landline, Fixed Data Circuit ID, or Mobile Ref):"
+            "📋 *New Service Ticket Request*\n\nPlease reply with your *Service Number* (e.g., Landline, Fixed Data Circuit ID):",
+            [{ id: "ACTION_CANCEL", title: "❌ Cancel Draft" }]
           );
         } else {
-          await sendMessage(
+          await sendButtons(
             this.phone,
-            "👋 *Welcome to the IP Service Support Portal*\n\n" +
-              "• Reply *'complaint'* to log a structured service issue.\n" +
-              "• Reply *'summary'* to access your system dashboard records.\n" +
-              "• Reply *'cancel'* to terminate any active processing window."
+            "👋 *Welcome to the IP Service Support Portal*\n\nChoose an action below to manage or file your service tickets.",
+            [
+              { id: "START_COMPLAINT", title: "📝 File Complaint" },
+              { id: "ACTION_SUMMARY", title: "📊 View Summary" }
+            ]
           );
         }
         break;
@@ -106,7 +110,14 @@ export class ComplaintFlowManager {
         });
 
         const classMenu = CLASSIFICATION_OPTIONS.map(o => `*${o.key}*. ${o.label}`).join("\n");
-        await sendMessage(this.phone, `Select **Task Classification** (Reply with the corresponding option number):\n\n${classMenu}`);
+        await sendButtons(
+          this.phone,
+          `Select **Task Classification** (Reply with option number):\n\n${classMenu}`,
+          [
+            { id: "ACTION_SUMMARY", title: "📊 Current Summary" },
+            { id: "ACTION_CANCEL", title: "❌ Cancel Ticket" }
+          ]
+        );
         break;
 
       case "AWAITING_CLASS":
@@ -122,7 +133,14 @@ export class ComplaintFlowManager {
         });
 
         const typeMenu = REQUEST_TYPE_OPTIONS.map(o => `*${o.key}*. ${o.label}`).join("\n");
-        await sendMessage(this.phone, `Select **Request Type** (Reply with the corresponding option number):\n\n${typeMenu}`);
+        await sendButtons(
+          this.phone,
+          `Select **Request Type** (Reply with option number):\n\n${typeMenu}`,
+          [
+            { id: "ACTION_SUMMARY", title: "📊 Current Summary" },
+            { id: "ACTION_CANCEL", title: "❌ Cancel Ticket" }
+          ]
+        );
         break;
 
       case "AWAITING_REQ_TYPE":
@@ -138,7 +156,14 @@ export class ComplaintFlowManager {
         });
 
         const specificMenu = SPECIFIC_REQUEST_OPTIONS.map(o => `*${o.key}*. ${o.label}`).join("\n");
-        await sendMessage(this.phone, `Select **Specific Request Type** (Reply with the corresponding option number):\n\n${specificMenu}`);
+        await sendButtons(
+          this.phone,
+          `Select **Specific Request Type** (Reply with option number):\n\n${specificMenu}`,
+          [
+            { id: "ACTION_SUMMARY", title: "📊 Current Summary" },
+            { id: "ACTION_CANCEL", title: "❌ Cancel Ticket" }
+          ]
+        );
         break;
 
       case "AWAITING_SPECIFIC":
@@ -154,13 +179,20 @@ export class ComplaintFlowManager {
         });
 
         const zoneMenu = ZONE_OPTIONS.map(o => `*${o.key}*. ${o.label}`).join("\n");
-        await sendMessage(this.phone, `Select **Operational Regional Zone** (Reply with the corresponding option number):\n\n${zoneMenu}`);
+        await sendButtons(
+          this.phone,
+          `Select **Operational Regional Zone** (Reply with option number):\n\n${zoneMenu}`,
+          [
+            { id: "ACTION_SUMMARY", title: "📊 Current Summary" },
+            { id: "ACTION_CANCEL", title: "❌ Cancel Ticket" }
+          ]
+        );
         break;
 
       case "AWAITING_ZONE":
         const selectedZone = ZONE_OPTIONS.find(o => o.key === sanitizedText);
         if (!selectedZone) {
-          await sendMessage(this.phone, "❌ *Unknown Zone Code.* Please select a numeric value between 1 and 25 corresponding to your designated office asset:");
+          await sendMessage(this.phone, "❌ *Unknown Zone Code.* Please select a numeric value between 1 and 25:");
           return;
         }
 
@@ -169,7 +201,11 @@ export class ComplaintFlowManager {
           tempZone: selectedZone.enum 
         });
 
-        await sendMessage(this.phone, "Understood. Finally, type any **Specific Remarks / Detailed Descriptions** concerning this regional ticket entry:");
+        await sendButtons(
+          this.phone,
+          "Understood. Finally, type any **Specific Remarks / Detailed Descriptions** concerning this regional ticket entry:",
+          [{ id: "ACTION_CANCEL", title: "❌ Cancel Ticket" }]
+        );
         break;
 
       case "AWAITING_REMARKS":
@@ -180,7 +216,6 @@ export class ComplaintFlowManager {
 
         const ticketId = `TK-${Date.now().toString().slice(-5)}-${Math.floor(100 + Math.random() * 900)}`;
 
-        // Atomic Transaction Commit with strict variable type casting
         await prisma.$transaction([
           prisma.complaint.create({
             data: {
@@ -210,27 +245,30 @@ export class ComplaintFlowManager {
         const localizedZoneLabel = ZONE_OPTIONS.find(o => o.enum === session.tempZone)?.label || session.tempZone;
 
         const receipt =
-          `✅ *Service Complaint Successfully Dispatched*\n\n` +
+          `✅ *Service Complaint Dispatched*\n\n` +
           `🎫 *Ticket Code:* ${ticketId}\n` +
           `📞 *Service Identifier:* ${session.tempServiceNumber}\n` +
           `📊 *Classification:* ${session.tempTasksClassification}\n` +
           `⚙️ *Type:* ${session.tempRequestType} ➔ ${session.tempSpecificRequestType}\n` +
           `📍 *Dispatched Zone:* ${localizedZoneLabel}\n` +
-          `📝 *Remarks:* "${sanitizedText}"\n\n` +
-          `This data layer payload has been submitted directly into Core Regional Systems routing infrastructure. Type *'summary'* to query status tracking logs.`;
+          `📝 *Remarks:* "${sanitizedText}"`;
 
-        await sendMessage(this.phone, receipt);
+        await sendButtons(
+          this.phone,
+          receipt,
+          [
+            { id: "START_COMPLAINT", title: "📝 New Complaint" },
+            { id: "ACTION_SUMMARY", title: "📊 Main Dashboard" }
+          ]
+        );
         break;
 
       default:
-        await this.resetSession("Session data reset. Please text *'complaint'* to re-initialize execution.");
+        await this.resetSession("Session data reset. Re-initializing.");
         break;
     }
   }
 
-  /**
-   * Generates complete dynamic dashboard data strings for user phone view interface
-   */
   private async sendSummaryData(): Promise<void> {
     const activeSession = await this.getOrCreateSession();
     const historicalTickets = await prisma.complaint.findMany({
@@ -247,14 +285,13 @@ export class ComplaintFlowManager {
         `• Next Phase Needed: _${activeSession.step.replace("AWAITING_", "Entering ")}_\n` +
         `• Logged Service Number: _${activeSession.tempServiceNumber || "Pending input"}_\n` +
         `• Class Selection: _${activeSession.tempTasksClassification || "Pending select"}_\n` +
-        `• Zone Targeted: _${activeSession.tempZone || "Pending select"}_\n` +
-        `💡 _Type 'cancel' to dump this active workspace flow._\n\n`;
+        `• Zone Targeted: _${activeSession.tempZone || "Pending select"}_\n\n`;
     }
 
     messagePayload += `📋 *Recent System Logs Submissions (${historicalTickets.length}):*\n`;
 
     if (historicalTickets.length === 0) {
-      messagePayload += `_No existing ticket assets registered to this phone number identifier line._`;
+      messagePayload += `_No existing ticket assets registered to this identifier line._`;
     } else {
       historicalTickets.forEach((ticket, idx) => {
         const badge = ticket.status === "PENDING" ? "⏳" : "✅";
@@ -262,13 +299,19 @@ export class ComplaintFlowManager {
           `\n*${idx + 1}. Ticket Reference: ${ticket.ticketNumber}*\n` +
           ` • Status: ${badge} _${ticket.status}_\n` +
           ` • Service Line: ${ticket.serviceNumber}\n` +
-          ` • Zone: ${ticket.zone}\n` +
-          ` • Path: ${ticket.tasksClassification} ➔ ${ticket.specificRequestType}\n` +
-          ` • Remarks: "${ticket.remarks}"\n`;
+          ` • Path: ${ticket.tasksClassification} ➔ ${ticket.specificRequestType}\n`;
       });
     }
 
-    await sendMessage(this.phone, messagePayload);
+    if (activeSession.step !== "IDLE") {
+      await sendButtons(this.phone, messagePayload, [
+        { id: "ACTION_CANCEL", title: "❌ Discard Draft" }
+      ]);
+    } else {
+      await sendButtons(this.phone, messagePayload, [
+        { id: "START_COMPLAINT", title: "📝 File Complaint" }
+      ]);
+    }
   }
 
   private async getOrCreateSession() {
@@ -312,6 +355,11 @@ export class ComplaintFlowManager {
         tempZone: { set: null }
       },
     });
-    await sendMessage(this.phone, `🔄 ${alertText}\nReturned to main portal window menu.`);
+    
+    await sendButtons(
+      this.phone,
+      `🔄 ${alertText}\nReturned to main portal window menu.`,
+      [{ id: "START_COMPLAINT", title: "📝 Start New Ticket" }]
+    );
   }
 }

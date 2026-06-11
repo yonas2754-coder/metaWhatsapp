@@ -1,42 +1,83 @@
-// src/utils/whatsapp.ts
-import axios from "axios";
+// src/lib/whatsapp.ts
 
-const TOKEN = process.env.WHATSAPP_TOKEN!;
-const PHONE_ID = process.env.PHONE_NUMBER_ID!;
+const WHATSAPP_TOKEN = process.env.WHATSAPP_TOKEN;
+const PHONE_NUMBER_ID = process.env.PHONE_NUMBER_ID;
+const API_VERSION = "v20.0";
 
-const whatsappApi = axios.create({
-  baseURL: `https://graph.facebook.com/v19.0/${PHONE_ID}`,
-  headers: {
-    Authorization: `Bearer ${TOKEN}`,
-    "Content-Type": "application/json",
-  },
-});
-
-// Send normal text messages
-export async function sendMessage(to: string, text: string) {
-  await whatsappApi.post("/messages", {
-    messaging_product: "whatsapp",
-    to,
-    type: "text",
-    text: { body: text },
-  });
+interface ReplyButton {
+  id: string;
+  title: string;
 }
 
-// Send structural interactive buttons (Looks like a clean UI menu)
-export async function sendButtons(to: string, text: string, buttons: { id: string; title: string }[]) {
-  await whatsappApi.post("/messages", {
-    messaging_product: "whatsapp",
-    to,
-    type: "interactive",
-    interactive: {
-      type: "button",
-      body: { text: text },
-      action: {
-        buttons: buttons.map((btn) => ({
-          type: "reply",
-          reply: { id: btn.id, title: btn.title },
-        })),
+export async function sendMessage(to: string, text: string): Promise<boolean> {
+  const url = `https://graph.facebook.com/${API_VERSION}/${PHONE_NUMBER_ID}/messages`;
+
+  try {
+    const response = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${WHATSAPP_TOKEN}`,
+        "Content-Type": "application/json",
       },
+      body: JSON.stringify({
+        messaging_product: "whatsapp",
+        recipient_type: "individual",
+        to: to,
+        type: "text",
+        text: { preview_url: false, body: text },
+      }),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      console.error("❌ WhatsApp Text API Transport Error:", JSON.stringify(errorData));
+      return false;
+    }
+    return true;
+  } catch (error) {
+    console.error("⛔ WhatsApp Service Network Failure:", error);
+    return false;
+  }
+}
+
+export async function sendButtons(to: string, text: string, buttons: ReplyButton[]): Promise<boolean> {
+  const url = `https://graph.facebook.com/${API_VERSION}/${PHONE_NUMBER_ID}/messages`;
+  const sanitizedButtons = buttons.slice(0, 3).map((btn) => ({
+    type: "reply",
+    reply: {
+      id: btn.id,
+      title: btn.title.substring(0, 20),
     },
-  });
+  }));
+
+  try {
+    const response = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${WHATSAPP_TOKEN}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        messaging_product: "whatsapp",
+        recipient_type: "individual",
+        to: to,
+        type: "interactive",
+        interactive: {
+          type: "button",
+          body: { text: text },
+          action: { buttons: sanitizedButtons },
+        },
+      }),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      console.error("❌ WhatsApp Buttons API Transport Error:", JSON.stringify(errorData));
+      return false;
+    }
+    return true;
+  } catch (error) {
+    console.error("⛔ WhatsApp Buttons Network Failure:", error);
+    return false;
+  }
 }

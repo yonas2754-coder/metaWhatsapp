@@ -32,13 +32,12 @@ export async function POST(req: Request) {
 
     if (!text) return NextResponse.json({ ok: true });
 
-    // Instantiates multi-tier state architecture
     const manager = new ComplaintFlowManager(from);
     await manager.handleMessage(text);
 
     return NextResponse.json({ ok: true });
   } catch (error) {
-    console.error("⛔ [Enterprise Failure Alert]:", error);
-    return NextResponse.json({ ok: false, error: "Handled processing cycle break" }, { status: 200 });
+    console.error("⛔ [Enterprise Webhook Failure]:", error);
+    return NextResponse.json({ ok: false, error: "Handled failure execution block" }, { status: 200 });
   }
 }
