@@ -89,8 +89,9 @@ export class ComplaintFlowManager {
         return;
       }
 
+      // Pre-format clean plain text message that will populate the destination conversation input box
       const shareContent = 
-        `📋 *SHARED TICKET DATA*\n` +
+        `📋 *FORWARDED TICKET DATA*\n` +
         `---------------------------\n` +
         `🎫 *Ticket:* ${ticketToShare.ticketNumber}\n` +
         `📞 *Service Identifier:* ${ticketToShare.serviceNumber}\n` +
@@ -98,10 +99,25 @@ export class ComplaintFlowManager {
         `⚙️ *Type:* ${ticketToShare.requestType} ➔ ${ticketToShare.specificRequestType}\n` +
         `📍 *Operational Zone:* ${ticketToShare.zone}\n` +
         `📝 *Status:* [${ticketToShare.status}]\n` +
-        `💬 *Remarks:* "${ticketToShare.remarks}"\n\n` +
-        `_Copy and forward this message context anywhere needed._`;
+        `💬 *Remarks:* "${ticketToShare.remarks}"`;
 
-      await sendButtons(this.phone, shareContent, [
+      // Generate the native WhatsApp API contact-selection deep link
+      const whatsappNativeShareUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(shareContent)}`;
+
+      /**
+       * Note: For interactive WhatsApp buttons to trigger an external Link Action, your underlying
+       * WhatsApp channel engine handler (e.g., Baileys, Venom, or Official Cloud API) must configure 
+       * the button payload as a URL type button. 
+       * * If your client uses text action triggers exclusively, we supply the direct blue click link line 
+       * below alongside the button so users can tap it to launch their native contacts list right away.
+       */
+      const instructionsMessage = 
+        `${shareContent}\n\n` +
+        `🔗 *Select Contact to Forward Ticket:*\n` +
+        `${whatsappNativeShareUrl}\n\n` +
+        `💡 _Tap the blue link above to open your WhatsApp contact list, pick a person, and send this ticket record directly!_`;
+
+      await sendButtons(this.phone, instructionsMessage, [
         { id: "ACTION_SUMMARY", title: "📊 Main Dashboard" }
       ]);
       return;
@@ -329,7 +345,6 @@ export class ComplaintFlowManager {
           `📍 *Dispatched Zone:* ${localizedZoneLabel}\n` +
           `📝 *Remarks:* "${sanitizedText}"`;
 
-        // Included SHARE_TICKET button to allow text transformation and easy forwarding
         await sendButtons(
           this.phone,
           receipt,
