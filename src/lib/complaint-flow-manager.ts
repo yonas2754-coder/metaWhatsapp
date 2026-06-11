@@ -83,7 +83,7 @@ export class ComplaintFlowManager {
           await this.updateSession({ step: "AWAITING_SERVICE_NUM" });
           await sendButtons(
             this.phone,
-            "📋 *New Service Ticket Request*\n\nPlease reply with your registered *Service Number* (e.g., DSL-12345):",
+            "📋 *New Service Ticket Request*\n\nPlease reply with your registered *Service Number*:",
             [{ id: "ACTION_CANCEL", title: "❌ Cancel Draft" }]
           );
         } else {
@@ -104,7 +104,7 @@ export class ComplaintFlowManager {
           return;
         }
 
-        // 🔍 DB VERIFICATION STEP: Checks if service identifier exists inside your system database
+        // 🔍 DATABASE LOOKUP VERIFICATION
         const isRegistered = await prisma.registeredService.findUnique({
           where: { serviceNumber: sanitizedText }
         });
@@ -118,7 +118,7 @@ export class ComplaintFlowManager {
           return;
         }
 
-        // If validation clears, cache the number and advance state step
+        // Validation passed -> Advance step status state
         await this.updateSession({ 
           step: "AWAITING_CLASS", 
           tempServiceNumber: sanitizedText 
@@ -127,7 +127,7 @@ export class ComplaintFlowManager {
         const classMenu = CLASSIFICATION_OPTIONS.map(o => `*${o.key}*. ${o.label}`).join("\n");
         await sendButtons(
           this.phone,
-          `✅ *Service Identified Verified*\n\nSelect **Task Classification** (Reply with option number):\n\n${classMenu}`,
+          `✅ *Service Identifier Verified*\n_Client: ${isRegistered.clientName}_\n\nSelect **Task Classification** (Reply with option number):\n\n${classMenu}`,
           [
             { id: "ACTION_SUMMARY", title: "📊 Current Summary" },
             { id: "ACTION_CANCEL", title: "❌ Cancel Ticket" }
