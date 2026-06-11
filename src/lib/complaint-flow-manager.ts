@@ -71,7 +71,7 @@ export class ComplaintFlowManager {
       return;
     }
     if (cleanLower === "cancel" || sanitizedText === "ACTION_CANCEL") {
-      await this.resetSession("Operation discarded successfully.");
+      await this.resetSession("Ticket draft discarded successfully.");
       return;
     }
 
@@ -83,67 +83,67 @@ export class ComplaintFlowManager {
           await this.updateSession({ step: "AWAITING_SERVICE_NUM" });
           await sendButtons(
             this.phone,
-            "📋 *New Service Ticket Request*\n\nPlease reply with your *Service Number*:",
+            "📋 *New Service Ticket Request*\n\nPlease reply with your registered *Service Number* (e.g., DSL-12345):",
             [{ id: "ACTION_CANCEL", title: "❌ Cancel Draft" }]
           );
-        } else if (cleanLower.includes("search") || sanitizedText === "START_SEARCH") {
-          // Change user session step to trigger the search workflow loop
+        } else if (cleanLower.includes("find") || sanitizedText === "START_SEARCH") {
+          // Dynamic tracking shift for searching lines
           await this.updateSession({ step: "AWAITING_SEARCH_SERVICE_NUM" });
           await sendButtons(
             this.phone,
-            "🔍 *Search Complaint Logs*\n\nPlease reply with the *Service Number* you want to trace records for:",
+            "🔍 *Find Complaints Dashboard*\n\nPlease type and reply with the *Service Number* to look up its historical log records:",
             [{ id: "ACTION_CANCEL", title: "❌ Back to Menu" }]
           );
         } else {
-          // Dynamic dashboard entry offering options for submission vs log tracking searches
+          // Home Menu rendering buttons cleanly with exact same styling layout
           await sendButtons(
             this.phone,
             "👋 *Welcome to the IP Service Support Portal*\n\nChoose an action below to manage or file your service tickets.",
             [
               { id: "START_COMPLAINT", title: "📝 File Complaint" },
-              { id: "START_SEARCH", title: "🔍 Search Ticket" },
+              { id: "START_SEARCH", title: "🔍 Find Complaint" },
               { id: "ACTION_SUMMARY", title: "📊 View Summary" }
             ]
           );
         }
         break;
 
-      // 🔍 NEW STATE STEP: Processes service number searches directly against Complaint history records
+      // 🔍 SEARCH FLOW ENGINE CASE
       case "AWAITING_SEARCH_SERVICE_NUM":
         if (sanitizedText.length < 4) {
-          await sendMessage(this.phone, "❌ *Invalid Search Criteria.* String length is too short. Try again:");
+          await sendMessage(this.phone, "❌ *Format Error.* The Service Number string is too short. Please try again:");
           return;
         }
 
-        // Query historical complaints matching the raw string parameter directly
-        const searchResults = await prisma.complaint.findMany({
+        // Directly query the Complaint model by serviceNumber
+        const foundComplaints = await prisma.complaint.findMany({
           where: { serviceNumber: sanitizedText },
-          orderBy: { createdAt: "desc" },
+          orderBy: { createdAt: "desc" }
         });
 
-        // Instantly return the session step tracking back to IDLE
+        // Always switch state back to IDLE to prevent loop lock
         await this.updateSession({ step: "IDLE" });
 
-        if (searchResults.length === 0) {
+        if (foundComplaints.length === 0) {
           await sendButtons(
             this.phone,
-            `🔍 *Search Logs for:* "${sanitizedText}"\n\n❌ No historical complaints have been found matching this service identification number.`,
-            [{ id: "START_COMPLAINT", title: "📝 File New Ticket" }]
+            `🔍 *Search Results for:* "${sanitizedText}"\n\n❌ No historical complaints found in the database system for this service number string.`,
+            [{ id: "START_COMPLAINT", title: "📝 File Complaint" }]
           );
         } else {
-          let searchPayload = `🔍 *Search Results for:* "${sanitizedText}"\nFound *${searchResults.length}* matched ticket logs:\n`;
+          let resultsMessage = `🔍 *Search Results for:* "${sanitizedText}"\nFound *${foundComplaints.length}* ticket log asset(s):\n`;
 
-          searchResults.forEach((ticket, idx) => {
+          foundComplaints.forEach((ticket, idx) => {
             const badge = ticket.status === "PENDING" ? "⏳" : "✅";
-            searchPayload += 
-              `\n*${idx + 1}. Ticket ID: ${ticket.ticketNumber}*\n` +
-              `  • Status: ${badge} _${ticket.status}_\n` +
-              `  • Path: ${ticket.tasksClassification} ➔ ${ticket.specificRequestType}\n` +
-              `  • Description: "${ticket.remarks}"\n`;
+            resultsMessage += 
+              `\n*${idx + 1}. Ticket Reference: ${ticket.ticketNumber}*\n` +
+              ` • Status: ${badge} _${ticket.status}_\n` +
+              ` • Classification: ${ticket.tasksClassification} ➔ ${ticket.specificRequestType}\n` +
+              ` • Remarks: "${ticket.remarks}"\n`;
           });
 
-          await sendButtons(this.phone, searchPayload, [
-            { id: "START_COMPLAINT", title: "📝 New Complaint" },
+          await sendButtons(this.phone, resultsMessage, [
+            { id: "START_COMPLAINT", title: "📝 File Complaint" },
             { id: "ACTION_SUMMARY", title: "📊 Main Dashboard" }
           ]);
         }
@@ -151,11 +151,10 @@ export class ComplaintFlowManager {
 
       case "AWAITING_SERVICE_NUM":
         if (sanitizedText.length < 4) {
-          await sendMessage(this.phone, "❌ *Invalid ID.* Please provide a complete valid Service Number string:");
+          await sendMessage(this.phone, "❌ *Format Error.* The Service Number string is too short. Please provide a valid identifier:");
           return;
         }
 
-        // Accepts number dynamically without verification matching, keeping old schema workflow intact
         await this.updateSession({ 
           step: "AWAITING_CLASS", 
           tempServiceNumber: sanitizedText 
@@ -164,7 +163,7 @@ export class ComplaintFlowManager {
         const classMenu = CLASSIFICATION_OPTIONS.map(o => `*${o.key}*. ${o.label}`).join("\n");
         await sendButtons(
           this.phone,
-          `Select **Task Classification** (Reply with option number):\n\n${classMenu}`,
+          `✅ *Service Identifier Logged*\n\nSelect **Task Classification** (Reply with option number):\n\n${classMenu}`,
           [
             { id: "ACTION_SUMMARY", title: "📊 Current Summary" },
             { id: "ACTION_CANCEL", title: "❌ Cancel Ticket" }
@@ -361,7 +360,8 @@ export class ComplaintFlowManager {
       ]);
     } else {
       await sendButtons(this.phone, messagePayload, [
-        { id: "START_COMPLAINT", title: "📝 File Complaint" }
+        { id: "START_COMPLAINT", title: "📝 File Complaint" },
+        { id: "START_SEARCH", title: "🔍 Find Complaint" }
       ]);
     }
   }
