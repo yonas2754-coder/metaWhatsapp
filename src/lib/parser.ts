@@ -1,3 +1,4 @@
+//parser.ts
 export function parseTT(text: string) {
   const tt = text.match(/tt[:\s]*([0-9]+)/i);
   const name = text.match(/name[:\s]*(.+)/i);

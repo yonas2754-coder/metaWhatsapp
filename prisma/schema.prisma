@@ -15,13 +15,18 @@ datasource db {
 model Complaint {
   id           String   @id @default(cuid())
   ticketNumber String   @unique
-
   phone        String
   ttNumber     String
   name         String?
   description  String?
-
   status       String   @default("PENDING")
-
   createdAt    DateTime @default(now())
+}
+
+model UserSession {
+  phone        String   @id // Use phone number as unique session ID
+  step         String   @default("IDLE") // IDLE, AWAITING_TT, AWAITING_NAME, AWAITING_DESC
+  tempTtNumber String?
+  tempName     String?
+  updatedAt    DateTime @updatedAt
 }
