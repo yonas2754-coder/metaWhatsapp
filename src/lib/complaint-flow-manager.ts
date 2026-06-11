@@ -83,7 +83,7 @@ export class ComplaintFlowManager {
           await this.updateSession({ step: "AWAITING_SERVICE_NUM" });
           await sendButtons(
             this.phone,
-            "📋 *New Service Ticket Request*\n\nPlease reply with your *Service Number* (e.g., Landline, Fixed Data Circuit ID):",
+            "📋 *New Service Ticket Request*\n\nPlease reply with your registered *Service Number* (e.g., DSL-12345):",
             [{ id: "ACTION_CANCEL", title: "❌ Cancel Draft" }]
           );
         } else {
@@ -100,10 +100,25 @@ export class ComplaintFlowManager {
 
       case "AWAITING_SERVICE_NUM":
         if (sanitizedText.length < 4) {
-          await sendMessage(this.phone, "❌ *Invalid ID.* Please provide a complete valid Service Number string:");
+          await sendMessage(this.phone, "❌ *Format Error.* The Service Number string is too short. Please provide a valid identifier:");
           return;
         }
 
+        // 🔍 DB VERIFICATION STEP: Checks if service identifier exists inside your system database
+        const isRegistered = await prisma.registeredService.findUnique({
+          where: { serviceNumber: sanitizedText }
+        });
+
+        if (!isRegistered) {
+          await sendButtons(
+            this.phone,
+            `⚠️ *Service Number Not Found*\n\nThe identifier "${sanitizedText}" is not registered in our database system.\n\nPlease double check the number and type it again:`,
+            [{ id: "ACTION_CANCEL", title: "❌ Cancel Draft" }]
+          );
+          return;
+        }
+
+        // If validation clears, cache the number and advance state step
         await this.updateSession({ 
           step: "AWAITING_CLASS", 
           tempServiceNumber: sanitizedText 
@@ -112,7 +127,7 @@ export class ComplaintFlowManager {
         const classMenu = CLASSIFICATION_OPTIONS.map(o => `*${o.key}*. ${o.label}`).join("\n");
         await sendButtons(
           this.phone,
-          `Select **Task Classification** (Reply with option number):\n\n${classMenu}`,
+          `✅ *Service Identified Verified*\n\nSelect **Task Classification** (Reply with option number):\n\n${classMenu}`,
           [
             { id: "ACTION_SUMMARY", title: "📊 Current Summary" },
             { id: "ACTION_CANCEL", title: "❌ Cancel Ticket" }
