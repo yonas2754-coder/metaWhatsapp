@@ -83,7 +83,7 @@ export class ComplaintFlowManager {
           await this.updateSession({ step: "AWAITING_SERVICE_NUM" });
           await sendButtons(
             this.phone,
-            "📋 *New Service Ticket Request*\n\nPlease reply with your registered *Service Number* (e.g., DSL-12345):",
+            "📋 *New Service Ticket Request*\n\nPlease reply with your registered *Service Number* :",
             [{ id: "ACTION_CANCEL", title: "❌ Cancel Draft" }]
           );
         } else if (cleanLower.includes("find") || sanitizedText === "START_SEARCH") {
